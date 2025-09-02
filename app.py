@@ -11,6 +11,9 @@ import time
 # Load environment variables
 load_dotenv()
 
+# Get API token from environment
+API_TOKEN = os.getenv("APIFY_API_TOKEN")
+
 # Page configuration
 st.set_page_config(
     page_title="Google Maps Business Scraper",
@@ -102,10 +105,10 @@ def send_to_webhook(data, webhook_url, send_individually=False):
     except requests.exceptions.RequestException as e:
         return False, f"Webhook error: {str(e)}"
 
-def scrape_google_maps(search_query, location, max_results, api_token, additional_options=None):
+def scrape_google_maps(search_query, location, max_results, additional_options=None):
     """Scrape Google Maps using Apify"""
     try:
-        client = ApifyClient(api_token)
+        client = ApifyClient(API_TOKEN)
         
         run_input = {
             "searchStringsArray": [search_query],
@@ -148,20 +151,17 @@ def scrape_google_maps(search_query, location, max_results, api_token, additiona
 st.title("Google Maps Business Scraper")
 st.markdown("Scrape business information from Google Maps with ease using Apify's crawler", unsafe_allow_html=True)
 
+# Check if API token is available
+if not API_TOKEN:
+    st.error("❌ Apify API token not found in environment variables. Please add APIFY_API_TOKEN to your .env file.")
+    st.stop()
+
 # Sidebar for configuration
 with st.sidebar:
     st.header("Settings")
     
     with st.container():
-        st.subheader("API Configuration")
-        api_token = st.text_input(
-            "Apify API Token",
-            type="password",
-            value=os.getenv("APIFY_API_TOKEN", ""),
-            placeholder="Enter your Apify API token",
-            help="Find your token in Apify's dashboard"
-        )
-        
+        st.subheader("Webhook Configuration")
         webhook_url = st.text_input(
             "Webhook URL (Optional)",
             placeholder="https://your-webhook-endpoint.com/data",
@@ -227,7 +227,7 @@ with st.container(border=True):
                 st.info("Run a search to see stats!")
 
 # Handle form submission
-if submit_button and api_token and search_query and location:
+if submit_button and search_query and location:
     if not st.session_state.scraping_in_progress:
         st.session_state.scraping_in_progress = True
         st.session_state.scraping_results = None
@@ -245,7 +245,7 @@ if submit_button and api_token and search_query and location:
         with st.status("Scraping in progress...", expanded=True) as status:
             st.write("Connecting to Apify...")
             success, results, run_info = scrape_google_maps(
-                search_query, location, max_results, api_token, additional_options
+                search_query, location, max_results, additional_options
             )
             
             if success:
@@ -264,8 +264,6 @@ if submit_button and api_token and search_query and location:
                 status.update(label=f"❌ Scraping failed: {results}", state="error")
                 st.toast(f"Scraping failed: {results}", icon="⚠️")
 elif submit_button:
-    if not api_token:
-        st.error("❌ Please provide your Apify API token")
     if not search_query:
         st.error("❌ Please enter a search query")
     if not location:
