@@ -30,6 +30,9 @@ st.markdown("""
 <style>
 .stApp { background-color: #f8f9fa; }
 h1 { color: #1a73e8; }
+._link_gzau3_10{
+   display: none !important;
+}
 /*.stFormSubmitButton > button { 
     background-color: #6B48FF !important; 
     color: white; 
