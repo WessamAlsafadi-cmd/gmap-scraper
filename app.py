@@ -345,36 +345,24 @@ if st.session_state.scraping_results:
         # Prepare dataframe for display with proper website handling
         display_df = df[['title', 'address', 'totalScore', 'reviewsCount', 'phone', 'website']].copy()
         
-        # Handle website column - show 'N/A' for empty/null websites
-        display_df['website_display'] = display_df['website'].apply(
+        # Handle website column - show 'N/A' for empty/null websites, keep valid URLs
+        display_df['website'] = display_df['website'].apply(
             lambda x: x if pd.notna(x) and str(x).strip() != '' and str(x) != 'N/A' else 'N/A'
         )
         
-        # Create column config with conditional website column
-        column_config = {
-            "title": st.column_config.TextColumn("Business Name", width="medium"),
-            "address": st.column_config.TextColumn("Address", width="large"),
-            "totalScore": st.column_config.NumberColumn("Rating", format="%.1f"),
-            "reviewsCount": st.column_config.NumberColumn("Reviews"),
-            "phone": st.column_config.TextColumn("Phone"),
-        }
-        
-        # Only use LinkColumn if there are valid websites, otherwise use TextColumn
-        has_valid_websites = display_df['website_display'].ne('N/A').any()
-        if has_valid_websites:
-            column_config["website_display"] = st.column_config.LinkColumn("Website", display_text="Visit")
-        else:
-            column_config["website_display"] = st.column_config.TextColumn("Website")
-        
-        # Drop original website column and rename display column
-        display_df = display_df.drop('website', axis=1)
-        display_df = display_df.rename(columns={'website_display': 'website'})
         display_df = display_df.fillna('N/A')
         
         st.data_editor(
             display_df,
             use_container_width=True,
-            column_config=column_config
+            column_config={
+                "title": st.column_config.TextColumn("Business Name", width="medium"),
+                "address": st.column_config.TextColumn("Address", width="large"),
+                "totalScore": st.column_config.NumberColumn("Rating", format="%.1f"),
+                "reviewsCount": st.column_config.NumberColumn("Reviews"),
+                "phone": st.column_config.TextColumn("Phone"),
+                "website": st.column_config.LinkColumn("Website", display_text="Visit")
+            }
         )
         
         with st.container(border=True):
