@@ -111,7 +111,25 @@ def send_to_webhook(data, webhook_url, send_individually=False):
 def scrape_google_maps(search_query, location, max_results, additional_options=None):
     """Scrape Google Maps using Apify"""
     try:
-        client = ApifyClient(API_TOKEN)
+        # Debug: Check token before creating client
+        if not API_TOKEN:
+            return False, "API token is empty or None", None
+        
+        if len(API_TOKEN.strip()) < 10:
+            return False, f"API token seems too short: {len(API_TOKEN)} characters", None
+        
+        # Create client with detailed error handling
+        try:
+            client = ApifyClient(API_TOKEN.strip())
+        except Exception as client_error:
+            return False, f"Failed to create Apify client: {str(client_error)}", None
+        
+        # Test the client first by checking user info
+        try:
+            user_info = client.user().get()
+            st.write(f"✅ Connected as user: {user_info.get('username', 'Unknown')}")
+        except Exception as auth_error:
+            return False, f"Authentication failed: {str(auth_error)}", None
         
         run_input = {
             "searchStringsArray": [search_query],
@@ -139,16 +157,27 @@ def scrape_google_maps(search_query, location, max_results, additional_options=N
             "allPlacesNoSearchAction": "",
         }
         
-        run = client.actor("compass/crawler-google-places").call(run_input=run_input)
+        # Try to start the actor
+        try:
+            st.write("🚀 Starting Google Maps scraper...")
+            run = client.actor("compass/crawler-google-places").call(run_input=run_input)
+            st.write(f"✅ Scraper started successfully with run ID: {run.get('id', 'Unknown')}")
+        except Exception as run_error:
+            return False, f"Failed to start scraper: {str(run_error)}", None
         
-        results = []
-        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            results.append(item)
+        # Get results
+        try:
+            results = []
+            for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                results.append(item)
+            st.write(f"✅ Retrieved {len(results)} results")
+        except Exception as data_error:
+            return False, f"Failed to retrieve results: {str(data_error)}", None
         
         return True, results, run
     
     except Exception as e:
-        return False, str(e), None
+        return False, f"Unexpected error: {str(e)}", None
 
 # Main UI
 st.title("Google Maps Business Scraper")
