@@ -30,9 +30,6 @@ st.markdown("""
 <style>
 .stApp { background-color: #f8f9fa; }
 h1 { color: #1a73e8; }
-._link_gzau3_10{
-   display: none !important;
-}
 /*.stFormSubmitButton > button { 
     background-color: #6B48FF !important; 
     color: white; 
@@ -192,17 +189,27 @@ if not API_TOKEN:
     st.stop()
 else:
     # Show API token status (masked for security)
-    st.sidebar.success(f"✅ API Token loaded: {'*' * 20}{API_TOKEN[-4:] if len(API_TOKEN) > 4 else '****'}")
+    masked_token = f"{'*' * (len(API_TOKEN) - 8)}{API_TOKEN[-4:]}" if len(API_TOKEN) > 8 else "****"
+    st.sidebar.success(f"✅ API Token loaded: {masked_token}")
+    
+    # Debug info
+    st.sidebar.info(f"Token length: {len(API_TOKEN)} characters")
+    
+    # Show first few characters for debugging (will remove this later)
+    if len(API_TOKEN) < 20:  # Only show if token seems wrong
+        st.sidebar.warning(f"🔍 Debug - Token starts with: '{API_TOKEN[:10]}...'")
+        st.sidebar.warning("⚠️ Token appears too short. Check your secrets.toml formatting.")
     
     # Add a test button to verify the token
     if st.sidebar.button("🔍 Test API Token"):
         try:
-            client = ApifyClient(API_TOKEN)
+            client = ApifyClient(API_TOKEN.strip())
             # Try to get user info to test the token
             user_info = client.user().get()
             st.sidebar.success(f"✅ Token valid for user: {user_info.get('username', 'Unknown')}")
         except Exception as e:
             st.sidebar.error(f"❌ Token test failed: {str(e)}")
+            st.sidebar.write(f"Full error details: {type(e).__name__}: {str(e)}")
 
 # Sidebar for configuration
 with st.sidebar:
@@ -335,17 +342,39 @@ if st.session_state.scraping_results:
             df = df[df['title'].str.contains(search_term, case=False, na=False) | 
                     df['address'].str.contains(search_term, case=False, na=False)]
         
+        # Prepare dataframe for display with proper website handling
+        display_df = df[['title', 'address', 'totalScore', 'reviewsCount', 'phone', 'website']].copy()
+        
+        # Handle website column - show 'N/A' for empty/null websites
+        display_df['website_display'] = display_df['website'].apply(
+            lambda x: x if pd.notna(x) and str(x).strip() != '' and str(x) != 'N/A' else 'N/A'
+        )
+        
+        # Create column config with conditional website column
+        column_config = {
+            "title": st.column_config.TextColumn("Business Name", width="medium"),
+            "address": st.column_config.TextColumn("Address", width="large"),
+            "totalScore": st.column_config.NumberColumn("Rating", format="%.1f"),
+            "reviewsCount": st.column_config.NumberColumn("Reviews"),
+            "phone": st.column_config.TextColumn("Phone"),
+        }
+        
+        # Only use LinkColumn if there are valid websites, otherwise use TextColumn
+        has_valid_websites = display_df['website_display'].ne('N/A').any()
+        if has_valid_websites:
+            column_config["website_display"] = st.column_config.LinkColumn("Website", display_text="Visit")
+        else:
+            column_config["website_display"] = st.column_config.TextColumn("Website")
+        
+        # Drop original website column and rename display column
+        display_df = display_df.drop('website', axis=1)
+        display_df = display_df.rename(columns={'website_display': 'website'})
+        display_df = display_df.fillna('N/A')
+        
         st.data_editor(
-            df[['title', 'address', 'totalScore', 'reviewsCount', 'phone', 'website']].fillna('N/A'),
+            display_df,
             use_container_width=True,
-            column_config={
-                "title": st.column_config.TextColumn("Business Name", width="medium"),
-                "address": st.column_config.TextColumn("Address", width="large"),
-                "totalScore": st.column_config.NumberColumn("Rating", format="%.1f"),
-                "reviewsCount": st.column_config.NumberColumn("Reviews"),
-                "phone": st.column_config.TextColumn("Phone"),
-                "website": st.column_config.LinkColumn("Website", display_text="Visit")
-            }
+            column_config=column_config
         )
         
         with st.container(border=True):
