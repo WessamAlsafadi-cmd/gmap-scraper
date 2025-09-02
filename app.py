@@ -11,8 +11,11 @@ import time
 # Load environment variables
 load_dotenv()
 
-# Get API token from environment
-API_TOKEN = os.getenv("APIFY_API_TOKEN")
+# Get API token from Streamlit secrets (for Streamlit Cloud) or environment
+try:
+    API_TOKEN = st.secrets["APIFY_API_TOKEN"]
+except:
+    API_TOKEN = os.getenv("APIFY_API_TOKEN")
 
 # Page configuration
 st.set_page_config(
@@ -27,9 +30,6 @@ st.markdown("""
 <style>
 .stApp { background-color: #f8f9fa; }
 h1 { color: #1a73e8; }
-._terminalButton_rix23_138{
-   display: none !important;
-}
 /*.stFormSubmitButton > button { 
     background-color: #6B48FF !important; 
     color: white; 
@@ -158,6 +158,19 @@ st.markdown("Scrape business information from Google Maps with ease using Apify'
 if not API_TOKEN:
     st.error("❌ Apify API token not found in environment variables. Please add APIFY_API_TOKEN to your .env file.")
     st.stop()
+else:
+    # Show API token status (masked for security)
+    st.sidebar.success(f"✅ API Token loaded: {'*' * 20}{API_TOKEN[-4:] if len(API_TOKEN) > 4 else '****'}")
+    
+    # Add a test button to verify the token
+    if st.sidebar.button("🔍 Test API Token"):
+        try:
+            client = ApifyClient(API_TOKEN)
+            # Try to get user info to test the token
+            user_info = client.user().get()
+            st.sidebar.success(f"✅ Token valid for user: {user_info.get('username', 'Unknown')}")
+        except Exception as e:
+            st.sidebar.error(f"❌ Token test failed: {str(e)}")
 
 # Sidebar for configuration
 with st.sidebar:
